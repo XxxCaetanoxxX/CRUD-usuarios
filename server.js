@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client'
 const app = express()
 const prisma = new PrismaClient()
 app.use(express.json())
+const { Prisma } = import('@prisma/client');
 
 app.post('/pessoas', async (request, response) => {
 
@@ -26,12 +27,18 @@ app.get('/pessoas', async (request, response) => {
 })
 
 app.get('/pessoas/:name', async (request, response) => {
-    const user = await prisma.user.findFirst({
-        where: {
-            name: request.params.name
-        },
-    })
-    response.json(user)
+
+    try {
+        const user = await prisma.user.findFirst({
+            where: {
+                name: request.params.name
+            },
+        })
+        response.json(user)
+    } catch (error) {
+        response.status(404).json({ error: "Nome de usuario não encontrado" })
+    }
+
 })
 
 
@@ -53,13 +60,15 @@ app.put('/pessoas/:id', async (request, response) => {
 
 app.delete('/pessoas/:id', async (request, response) => {
 
-    const user = await prisma.user.delete({
-        where: {
-            id: request.params.id
-        }
-    })
-
-    response.status(200).json({ message: `Usuário  ${user.name} deletado` })
+    try {
+        const user = await prisma.user.delete({
+            where: {
+                id: request.params.id
+            }
+        })
+    } catch (error) {
+        response.status(404).json({ error: 'Usuário não encontrado' });
+    }
 })
 
 
