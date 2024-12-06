@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
 
 const app = express()
 //a  cada query realizada no banco, ira gerar um log
-const prisma = new PrismaClient({log: ['query'],})
+const prisma = new PrismaClient({ log: ['query'], })
 app.use(express.json())
 const { Prisma } = import('@prisma/client');
 import { z } from 'zod'
@@ -45,21 +45,32 @@ app.post('/login', async (request, response) => {
         senha: z.string().min(4)
     })
 
-    const data = loginUserSchema.parse(request.body)
+    try {
+        const data = loginUserSchema.parse(request.body)
 
-    const user = await prisma.user.findFirst({
-        where: {
-            name: data.name
+        const user = await prisma.user.findFirst({
+            where: {
+                name: data.name
+            }
+        });
+
+        if (!user || user.senha !== data.senha) {
+            return response.status(401).json({ error: 'Credenciais inválidas' });
         }
-    });
 
-    if (!user || user.senha !== data.senha) {
-        return response.status(401).json({ error: 'Credenciais inválidas' });
+        const token = jwt.sign({ userId: user.id, perfil: user.perfil }, 'sua_chave_secreta', { expiresIn: '1h' });
+
+        response.status(200).json({ token });
+    } catch (error) {
+        if (error instanceof z.ZodError) {
+            return response.status(400).json({ error: error.errors })
+        } else {
+            console.error('Erro no login:', error);
+            response.status(500).json({ error: 'Erro interno do servidor' })
+        }
     }
 
-    const token = jwt.sign({ userId: user.id, perfil: user.perfil }, 'sua_chave_secreta', { expiresIn: '1h' });
 
-    response.status(200).json({ token });
 });
 
 //criar usuario
@@ -120,32 +131,31 @@ app.put('/pessoas/:id', authenticate, authorize(['ADMIN', 'GERENTE']), async (re
     const updateUserSchema = z.object({
         name: z.string().min(4),
         perfil: z.string().min(5),
-        senha: z.string().min(4),
-    });
+        senha: z.string().min(4)
+    })
 
-    const id = request.params.id;
-    if (!id || typeof id !== 'string') {
-        return response.status(400).json({ error: 'ID inválido.' });
-    }
-
-    try{
-        const data = updateUserSchema.parse(request.body);
+    try {
+        const data = updateUserSchema.parse(request.body)
+        const id = request.params.id
 
         const user = await prisma.user.update({
-            where: { id },
-            data,
-        });
+            where: {
+                id: id
+            },
+            data: data,
+        })
 
-        response.status(200).json(user);
-    } catch(error){
-        response.status(400).json({error: 'Erro ao atualziar o usuário'});
+        response.json(user)
+
+    } catch (error) {
+        response.status(400).json({ error: 'Erro ao atualzizar usuário' });
     }
 })
 
 //deletar pessoa
 app.delete('/pessoas/:id', authenticate, authorize(['ADMIN']), async (request, response) => {
 
-    const deleteSchema = z.string().uuid("O ID deve ser válido");    
+    const deleteSchema = z.string().uuid("O ID deve ser válido");
 
     try {
         const id = deleteSchema.parse(request.params.id)
@@ -159,11 +169,10 @@ app.delete('/pessoas/:id', authenticate, authorize(['ADMIN']), async (request, r
         response.status(200).json({ message: `Usuário ${user.name} deletado com sucesso` })
 
     } catch (error) {
-        if(error instanceof z.ZodError){
+        if (error instanceof z.ZodError) {
             return response.status(400).json({ error: error.errors });
-        } else{
+        } else {
             response.status(404).json({ error: 'Usuário não encontrado' });
-
         }
     }
 })
