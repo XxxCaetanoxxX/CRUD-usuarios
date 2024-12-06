@@ -12,7 +12,7 @@ import { z } from 'zod'
 
 function authorize(allowedRoles) {
     return (request, response, next) => {
-        const { perfil } = request.body;
+        const { perfil } = request.user; //recupera o perfil da pessoa logada
 
         if (!perfil || !allowedRoles.includes(perfil.toUpperCase())) {
             return response.status(403).json({ error: 'Acesso negado: você não tem permissão para realizar esta ação' })
@@ -27,11 +27,13 @@ function authenticate(request, response, next) {
     if (!token) return response.status(401).json({ error: 'Token não fornecido' });
 
     try {
-        const decoded = jwt.verify(token, 'sua_chave_secreta');
+        const decoded = jwt.verify(token, process.env.JWT_SECRETY);
         request.user = decoded;
         next();
     } catch (error) {
-        response.status(403).json({ error: 'Token inválido' })
+        console.log(process.env.JWT_SECRETY)
+        console.log(error)
+        response.status(401).json({ error: 'Token inválido' })
     }
 
 }
@@ -58,7 +60,7 @@ app.post('/login', async (request, response) => {
             return response.status(401).json({ error: 'Credenciais inválidas' });
         }
 
-        const token = jwt.sign({ userId: user.id, perfil: user.perfil }, 'sua_chave_secreta', { expiresIn: '1h' });
+        const token = jwt.sign({ userId: user.id, perfil: user.perfil }, process.env.JWT_SECRETY, { expiresIn: '1h' });
 
         response.status(200).json({ token });
     } catch (error) {
@@ -83,7 +85,7 @@ app.post('/pessoas', authenticate, authorize(['ADMIN', 'GERENTE']), async (reque
     })
 
     try {
-        const data = createEventSchema.parse(request.body)
+        const data = createUserSchema.parse(request.body)
 
         const user = await prisma.user.create({
             data: {
@@ -94,12 +96,13 @@ app.post('/pessoas', authenticate, authorize(['ADMIN', 'GERENTE']), async (reque
         })
         response.status(201).json(user)
     } catch (error) {
+        console.log(error)
         response.status(400).json({ error: 'Erro ao criar usuário' });
     }
 })
 
 //recuperar todas as pessoas
-app.get('/pessoas', async (request, response) => {
+app.get('/pessoas', authenticate ,async (request, response) => {
 
     const users = await prisma.user.findMany()
     response.status(200).json(users)
