@@ -37,7 +37,6 @@ function authenticate(request, response, next) {
 app.post('/login', async (request, response) => {
     const { name, senha } = request.body;
 
-    // Supondo que você tenha um método para encontrar o usuário no banco
     const user = await prisma.user.findFirst({
         where: {
             name: name
