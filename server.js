@@ -1,6 +1,7 @@
 import express from 'express'
 import { PrismaClient } from '@prisma/client'
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
 
 
 const app = express()
@@ -59,8 +60,16 @@ app.post('/login', async (request, response) => {
             }
         });
 
-        if (!user || user.senha !== data.senha) {
-            return response.status(401).json({ error: 'Credenciais inválidas' });
+        if (!user) {
+            return response.status(401).json({ error: 'usuário inválido' });
+        }
+
+        //compara a senha inserida no json com a senha do usuario do banco respectivamente
+        const isSenhaValida = await bcrypt.compare(data.senha, user.senha);
+
+        //se a senha do banco e do usuario digitado nao coencidirem
+        if(!isSenhaValida){
+            return response.status(401).json({error: 'senha inválidas'});
         }
 
         //cria um token, passando o id e o perfil do usuário, mais a chave secreta, ao final, o tempo de validação do token
@@ -79,6 +88,7 @@ app.post('/login', async (request, response) => {
 
 });
 
+//retorna os dados do usuário logado
 app.get('/usuario', authenticate, async (request, response) => {
     try {
         const userId = request.user.userId;
@@ -112,11 +122,15 @@ app.post('/pessoas', authenticate, authorize(['ADMIN', 'GERENTE']), async (reque
     try {
         const data = createUserSchema.parse(request.body)
 
+        // pega a senha inserida no json e a codifica
+        const senhaCriptografada = await bcrypt.hash(data.senha, 10);
+
         const user = await prisma.user.create({
             data: {
                 name: data.name,
                 perfil: data.perfil,
-                senha: data.senha
+                //cria um usuario com a senha criptografada
+                senha: senhaCriptografada
             }
         })
         response.status(201).json(user)
