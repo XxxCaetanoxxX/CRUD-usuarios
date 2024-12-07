@@ -82,7 +82,7 @@ rotas.post('/pessoas', authenticate, authorize(['ADMIN', 'GERENTE']), async (req
 
     const createUserSchema = z.object({
         name: z.string().min(4),
-        perfil: z.string().min(5),
+        perfil: z.enum(['PADRAO','GERENTE','ADMIN']),
         senha: z.string().min(4)
     })
 
@@ -139,7 +139,7 @@ rotas.put('/pessoas/:id', authenticate, authorize(['ADMIN', 'GERENTE']), async (
 
     const updateUserSchema = z.object({
         name: z.string().min(4),
-        perfil: z.string().min(5),
+        perfil: z.enum(['PADRAO','GERENTE','ADMIN']),
         senha: z.string().min(4)
     })
 
