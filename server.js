@@ -6,12 +6,14 @@ import jwt from 'jsonwebtoken';
 const app = express()
 //a  cada query realizada no banco, ira gerar um log
 const prisma = new PrismaClient({ log: ['query'], })
+//informa que os dados virão no formato json
 app.use(express.json())
 const { Prisma } = import('@prisma/client');
 import { z } from 'zod'
 
 function authorize(allowedRoles) {
     return (request, response, next) => {
+        // caso fosse const { name } = request.user; eu estaria recuperando somente o nome
         const { perfil } = request.user; //recupera o perfil da pessoa logada
 
         if (!perfil || !allowedRoles.includes(perfil.toUpperCase())) {
@@ -28,6 +30,7 @@ function authenticate(request, response, next) {
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRETY);
+        //decodifica todos os dados do usuário que vem do token
         request.user = decoded;
         next();
     } catch (error) {
@@ -60,6 +63,7 @@ app.post('/login', async (request, response) => {
             return response.status(401).json({ error: 'Credenciais inválidas' });
         }
 
+        //cria um token, passando o id e o perfil do usuário, mais a chave secreta, ao final, o tempo de validação do token
         const token = jwt.sign({ userId: user.id, perfil: user.perfil }, process.env.JWT_SECRETY, { expiresIn: '1h' });
 
         response.status(200).json({ token });
@@ -73,6 +77,27 @@ app.post('/login', async (request, response) => {
     }
 
 
+});
+
+app.get('/usuario', authenticate, async (request, response) => {
+    try {
+        const userId = request.user.userId;
+
+        const user = await prisma.user.findFirst({
+            where: {
+                id: userId
+            }
+        });
+
+        if (!user) {
+            return response.status(404).json({ error: 'Usuário não enconttrado' });
+        }
+
+        response.status(200).json(user);
+    } catch (error) {
+        console.log(error);
+        response.status(500).json({ error: 'Erro ao buscar dados do usuário' });
+    }
 });
 
 //criar usuario
@@ -102,7 +127,7 @@ app.post('/pessoas', authenticate, authorize(['ADMIN', 'GERENTE']), async (reque
 })
 
 //recuperar todas as pessoas
-app.get('/pessoas', authenticate ,async (request, response) => {
+app.get('/pessoas', authenticate, async (request, response) => {
 
     const users = await prisma.user.findMany()
     response.status(200).json(users)
@@ -110,7 +135,7 @@ app.get('/pessoas', authenticate ,async (request, response) => {
 })
 
 //recuperar pessoa pelo nome
-app.get('/pessoas/:name', async (request, response) => {
+app.get('/pessoas/:name', authenticate, async (request, response) => {
     try {
         const user = await prisma.user.findFirst({
             where: {
