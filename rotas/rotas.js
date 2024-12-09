@@ -19,6 +19,14 @@ rotas.post('/login', async (request, response, next) => {
         senha: z.string().min(4)
     })
 
+    const validationResult = loginUserSchema.safeParse(request.body)
+    if(!validationResult.success){
+        const error = new Error(validationResult.error.message);
+        error.status = 400;
+        error.validationErrors = validationResult.error.errors;
+        return next(error);
+    }
+
     const data = loginUserSchema.parse(request.body)
 
     prisma.user
@@ -77,20 +85,28 @@ rotas.get('/usuario', authenticate, async (request, response, next) => {
 });
 
 //criar usuario
-rotas.post('/pessoas', authenticate, authorize(['ADMIN', 'GERENTE']), async (request, response) => {
+rotas.post('/pessoas', authenticate, authorize(['ADMIN', 'GERENTE']), async (request, response, next) => {
 
     const createUserSchema = z.object({
-        name: z.string().min(4),
-        perfil: z.enum(['PADRAO', 'GERENTE', 'ADMIN']),
-        senha: z.string().min(4)
+        name: z.string().min(4, {message: "o Nome deve ter pelo menos 4 caracteres"}),
+        perfil: z.enum(['PADRAO', 'GERENTE', 'ADMIN'], {message:"o perfil deve ser PADRAO, GERENTE ou ADMIN"}),
+        senha: z.string().min(4, {message : "a senha deve ocnter pelo menos 4 caracteres"})
     })
 
-    const data = createUserSchema.parse(request.body)
+    const validationResult = createUserSchema.safeParse(request.body)
+    if(!validationResult.success){
+        const error = new Error(validationResult.error.message);
+        error.status = 400;
+        error.validationErrors = validationResult.error.errors;
+        return next(error);
+    }
+
+    const data = validationResult.data;
 
     // pega a senha inserida no json e a codifica
     const senhaCriptografada = await bcrypt.hash(data.senha, 10);
 
-    const user = await prisma.user.create({
+     await prisma.user.create({
         data: {
             name: data.name,
             perfil: data.perfil,
@@ -117,7 +133,6 @@ rotas.get('/pessoas', authenticate, async (request, response) => {
 
 //recuperar pessoa pelo nome
 rotas.get('/pessoas/:name', authenticate, async (request, response, next) => {
-
     //recuopera nome e vê se o parametro foi passado corretamente
     const name = request.params.name.trim();
     if (!name || name == "") {
@@ -154,10 +169,20 @@ rotas.get('/pessoas/:name', authenticate, async (request, response, next) => {
 rotas.put('/pessoas/:id', authenticate, authorize(['ADMIN', 'GERENTE']), async (request, response, next) => {
 
     const updateUserSchema = z.object({
-        name: z.string().min(4),
-        perfil: z.enum(['PADRAO', 'GERENTE', 'ADMIN']),
-        senha: z.string().min(4)
+        name: z.string().min(4, {message: "o Nome deve ter pelo menos 4 caracteres"}),
+        perfil: z.enum(['PADRAO', 'GERENTE', 'ADMIN'], {message:"o perfil deve ser PADRAO, GERENTE ou ADMIN"}),
+        senha: z.string().min(4, {message : "a senha deve ocnter pelo menos 4 caracteres"})
     })
+
+    //validar todos os dados do zod
+    const validationResult = updateUserSchema.safeParse(request.body);
+    if(!validationResult.success){
+        const error = new Error(validationResult.error.message);
+        error.status = 400;
+        error.validationErrors = validationResult.error.errors;
+        return next(error);
+    }
+
 
     const data = updateUserSchema.parse(request.body)
     const id = request.params.id?.trim();
@@ -215,7 +240,7 @@ rotas.delete('/pessoas/:id', authenticate, authorize(['ADMIN']), async (request,
     });
 
     if (!user) {
-        const error = new Error('usuário não encontrado pelo id')
+        const error = new Error('usuário não encontrado pelo id inserido')
         error.status = 404
         return next(error);
     }
