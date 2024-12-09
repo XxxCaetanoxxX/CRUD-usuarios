@@ -21,32 +21,38 @@ rotas.post('/login', async (request, response, next) => {
 
     const data = loginUserSchema.parse(request.body)
 
-    const user = await prisma.user.findFirst({
-        where: {
-            name: data.name
-        }
-    });
+    prisma.user
+        .findFirst({
+            where: { name: data.name },
+        })
+        // then nao suporta await
+        .then(user => {
+            if (!user) {
+                const error = new Error('Usuário não encontrado');
+                error.status = 404;
+                throw error; //lança o erro para o catch
+            }
 
-    if(!user){
-        const error = new Error('usuario nao encontrado');
-        error.status = 404;
-        next(error);
-    }
+            // then nao suporta await
+            // Compara a senha
+            return bcrypt.compare(data.senha, user.senha).then(isSenhaValida => {
+                if (!isSenhaValida) {
+                    const error = new Error('Senha inválida');
+                    error.status = 401;
+                    throw error;
+                }
 
-    //compara a senha inserida no json com a senha do usuario do banco respectivamente
-    const isSenhaValida = await bcrypt.compare(data.senha, user.senha);
+                // Gera o token JWT
+                const token = jwt.sign(
+                    { userId: user.id, perfil: user.perfil },
+                    process.env.JWT_SECRETY,
+                    { expiresIn: '2h' }
+                );
 
-    //se a senha do banco e do usuario digitado nao coencidirem
-    if (!isSenhaValida) {
-        const error = new Error('Senha inválida');
-        error.status = 401;
-        next(error);
-    }
-
-    //cria um token, passando o id e o perfil do usuário, mais a chave secreta, ao final, o tempo de validação do token
-    const token = jwt.sign({ userId: user.id, perfil: user.perfil }, process.env.JWT_SECRETY, { expiresIn: '1h' });
-
-    response.status(200).json({ token });
+                response.status(200).json({ token });
+            });
+        })
+        .catch(error => next(error));
 });
 
 //retorna os dados do usuário logado
@@ -58,12 +64,15 @@ rotas.get('/usuario', authenticate, async (request, response, next) => {
             id: userId
         }
     }).then(user => {
+
+        if (!user) {
+            const error = new Error('usuário não identificado');
+            error.status = 404;
+            throw error;
+        }
+
         response.status(200).json(user);
-    }).catch(error =>{
-        new Error('Usuário não encontrado')
-        error.status = 404;
-        next(error)
-    });
+    }).catch(error => next(error));
 
 });
 
@@ -109,20 +118,35 @@ rotas.get('/pessoas', authenticate, async (request, response) => {
 //recuperar pessoa pelo nome
 rotas.get('/pessoas/:name', authenticate, async (request, response, next) => {
 
-    const user = await prisma.user.findFirst({
+    //recuopera nome e vê se o parametro foi passado corretamente
+    const name = request.params.name.trim();
+    if (!name || name == "") {
+        const error = new Error('Nome vazio')
+        error.status = 401
+        return next(error);
+    }
+
+    //verifica se o usuario existe
+    const user = await  prisma.user.findFirst({
         where: {
-            name: request.params.name
+            name: name
+        }
+    });
+
+    //se não existir, lança um erro e encerra o processo
+    if (!user) {
+        const error = new Error(`usuário com o nome ${name} não encontrado`)
+        error.status = 404;
+        return next(error);
+    }
+
+    await prisma.user.findFirst({
+        where: {
+            name: name
         },
     }).then(user => {
         response.status(200).json(user)
-    })
-
-    if (!user) {
-        const error = new Error('Usuário não encontrado ao pesquisar pelo nome')
-        error.status = 404;
-        next(error);
-    }
-
+    }).catch(error => next(error));
 
 })
 
@@ -136,11 +160,30 @@ rotas.put('/pessoas/:id', authenticate, authorize(['ADMIN', 'GERENTE']), async (
     })
 
     const data = updateUserSchema.parse(request.body)
-    const id = request.params.id
+    const id = request.params.id?.trim();
+    //verifica se tem um id
+    if (!id) {
+        const error = new Error('id invalido')
+        error.status = 401
+        return next(error);
+    }
+
     //criptografa nova senha
     const senhaCriptografada = await bcrypt.hash(data.senha, 10);
 
-    const user = await prisma.user.update({
+    //verifica se existe um usuario com o id inserido na url
+    const user = await prisma.user.findFirst({
+        where: { id },
+    })
+
+    //se não existir, lanca um erro e interrompe o processo
+    if (!user) {
+        const error = new Error('Usuário não encontrado pelo id');
+        error.status = 404;
+        return next(error); // Interrompe a execução se o usuário não for encontrado
+    }
+
+    await prisma.user.update({
         where: {
             id: id
         },
@@ -151,30 +194,39 @@ rotas.put('/pessoas/:id', authenticate, authorize(['ADMIN', 'GERENTE']), async (
         },
     }).then(user => {
         response.status(200).json(user)
-    }).catch(error => {
-        error.message = 'usuário não encontrado pelo id';
-        error.status = 404;
-        next(error);
-    })
+    }).catch(error => next(error))
 
 })
 
 //deletar pessoa
 rotas.delete('/pessoas/:id', authenticate, authorize(['ADMIN']), async (request, response, next) => {
 
-    const deleteSchema = z.string();
+    const id = request.params.id?.trim();
+    //verifica se tem um id
+    if (!id) {
+        const error = new Error('id invalido')
+        error.status = 401
+        return next(error);
+    }
 
-    const id = deleteSchema.parse(request.params.id)
+    //verifica se existe um usuario com o id inserido na url
+    const user = await prisma.user.findFirst({
+        where: { id },
+    });
 
-    const user = await prisma.user.delete({
+    if (!user) {
+        const error = new Error('usuário não encontrado pelo id')
+        error.status = 404
+        return next(error);
+    }
+
+    await prisma.user.delete({
         where: {
             id: id
         }
     }).then(user => {
         response.status(200).json({ message: `Usuário ${user.name} deletado com sucesso` });
     }).catch(error => {
-        error.message = 'usuário não encontrado pelo id';
-        error.status = 404;
         next(error);
     })
 
