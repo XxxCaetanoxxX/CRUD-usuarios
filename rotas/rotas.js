@@ -137,6 +137,7 @@ rotas.get('/pessoas/:name', authenticate, async (request, response, next) => {
 
 })
 
+//recuperando pessoa por id
 rotas.get('/usuario/:id', authenticate, async (request, response, next)=>{
     const id = request.params.id?.trim() || null;
 
