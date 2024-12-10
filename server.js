@@ -38,4 +38,4 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(3000, () => console.log('Servidor rodando'));
+app.listen(process.env.PORT ? Number(process.env.PORT) : 3000, () => console.log('Servidor rodando'));
