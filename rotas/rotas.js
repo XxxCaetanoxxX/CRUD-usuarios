@@ -5,6 +5,7 @@ import bcrypt from 'bcrypt';
 import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient({ log: ['query'], })
 import jwt from 'jsonwebtoken';
+import { ApiError } from '../Erros/erros.js';
 
 
 import express from 'express';
@@ -15,72 +16,61 @@ const rotas = Router();
 rotas.post('/login', async (request, response, next) => {
 
     const loginUserSchema = z.object({
-        name: z.string().min(4),
-        senha: z.string().min(4)
+        name: z.string().min(4, "Nome deve ter mais do que 4 caracteres"),
+        senha: z.string().min(4, "Senha deve ter mais do que  caracteres")
     })
 
     const validationResult = loginUserSchema.safeParse(request.body)
-    if(!validationResult.success){
-        const error = new Error(validationResult.error.message);
-        error.status = 400;
-        error.validationErrors = validationResult.error.errors;
-        return next(error);
+    if (!validationResult.success) {
+        return next(validationResult.error);
     }
 
     const data = loginUserSchema.parse(request.body)
 
-    prisma.user
+    const user = await prisma.user
         .findFirst({
             where: { name: data.name },
-        })
-        // then nao suporta await
-        .then(user => {
-            if (!user) {
-                const error = new Error('Usuário não encontrado');
-                error.status = 404;
-                throw error; //lança o erro para o catch
-            }
+        });
 
-            // then nao suporta await
-            // Compara a senha
-            return bcrypt.compare(data.senha, user.senha).then(isSenhaValida => {
-                if (!isSenhaValida) {
-                    const error = new Error('Senha inválida');
-                    error.status = 401;
-                    throw error;
-                }
+    if (!user) {
+        return next(new ApiError('Usuário não encontrado', 404));
+    }
 
-                // Gera o token JWT
-                const token = jwt.sign(
-                    { userId: user.id, perfil: user.perfil },
-                    process.env.JWT_SECRETY,
-                    { expiresIn: '2h' }
-                );
+    // Compara a senha
+    return bcrypt.compare(data.senha, user.senha).then(isSenhaValida => {
+        if (!isSenhaValida) {
+            return next(new ApiError('Senha inválida', 401));
+        }
 
-                response.status(200).json({ token });
-            });
-        })
-        .catch(error => next(error));
+        // Gera o token JWT
+        const token = jwt.sign(
+            { userId: user.id, perfil: user.perfil },
+            process.env.JWT_SECRETY,
+            { expiresIn: '2h' }
+        );
+
+        response.status(200).json({ token });
+    });
+
+
 });
 
 //retorna os dados do usuário logado
-rotas.get('/usuario', authenticate, async (request, response, next) => {
+rotas.get('/usuario/logado', authenticate, async (request, response, next) => {
     const userId = request.user.userId;
 
     await prisma.user.findFirst({
         where: {
             id: userId
         }
-    }).then(user => {
+    });
 
-        if (!user) {
-            const error = new Error('usuário não identificado');
-            error.status = 404;
-            throw error;
-        }
+    if (!user) {
+        return next(new ApiError('Usuário não encontrado', 404));
+    }
 
-        response.status(200).json(user);
-    }).catch(error => next(error));
+    response.status(200).json(user);
+
 
 });
 
@@ -88,17 +78,14 @@ rotas.get('/usuario', authenticate, async (request, response, next) => {
 rotas.post('/pessoas', authenticate, authorize(['ADMIN', 'GERENTE']), async (request, response, next) => {
 
     const createUserSchema = z.object({
-        name: z.string().min(4, {message: "o Nome deve ter pelo menos 4 caracteres"}),
-        perfil: z.enum(['PADRAO', 'GERENTE', 'ADMIN'], {message:"o perfil deve ser PADRAO, GERENTE ou ADMIN"}),
-        senha: z.string().min(4, {message : "a senha deve ocnter pelo menos 4 caracteres"})
+        name: z.string().min(4, "o Nome deve ter pelo menos 4 caracteres"),
+        perfil: z.enum(['PADRAO', 'GERENTE', 'ADMIN'], "o perfil deve ser PADRAO, GERENTE ou ADMIN"),
+        senha: z.string().min(4, "a senha deve ocnter pelo menos 4 caracteres")
     })
 
     const validationResult = createUserSchema.safeParse(request.body)
-    if(!validationResult.success){
-        const error = new Error(validationResult.error.message);
-        error.status = 400;
-        error.validationErrors = validationResult.error.errors;
-        return next(error);
+    if (!validationResult.success) {
+        return next(validationResult.error);
     }
 
     const data = validationResult.data;
@@ -106,7 +93,7 @@ rotas.post('/pessoas', authenticate, authorize(['ADMIN', 'GERENTE']), async (req
     // pega a senha inserida no json e a codifica
     const senhaCriptografada = await bcrypt.hash(data.senha, 10);
 
-     await prisma.user.create({
+    await prisma.user.create({
         data: {
             name: data.name,
             perfil: data.perfil,
@@ -136,13 +123,11 @@ rotas.get('/pessoas/:name', authenticate, async (request, response, next) => {
     //recuopera nome e vê se o parametro foi passado corretamente
     const name = request.params.name.trim();
     if (!name || name == "") {
-        const error = new Error('Nome vazio')
-        error.status = 401
-        return next(error);
+        return next(new ApiError('Nome vazio', 400));
     }
 
     //verifica se o usuario existe
-    const user = await  prisma.user.findFirst({
+    const user = await prisma.user.findFirst({
         where: {
             name: name
         }
@@ -150,18 +135,10 @@ rotas.get('/pessoas/:name', authenticate, async (request, response, next) => {
 
     //se não existir, lança um erro e encerra o processo
     if (!user) {
-        const error = new Error(`usuário com o nome ${name} não encontrado`)
-        error.status = 404;
-        return next(error);
+        return next(new ApiError(`usuário com o nome ${name} não encontrado`, 404));
     }
 
-    await prisma.user.findFirst({
-        where: {
-            name: name
-        },
-    }).then(user => {
-        response.status(200).json(user)
-    }).catch(error => next(error));
+    response.status(200).json(user);
 
 })
 
@@ -169,18 +146,15 @@ rotas.get('/pessoas/:name', authenticate, async (request, response, next) => {
 rotas.put('/pessoas/:id', authenticate, authorize(['ADMIN', 'GERENTE']), async (request, response, next) => {
 
     const updateUserSchema = z.object({
-        name: z.string().min(4, {message: "o Nome deve ter pelo menos 4 caracteres"}),
-        perfil: z.enum(['PADRAO', 'GERENTE', 'ADMIN'], {message:"o perfil deve ser PADRAO, GERENTE ou ADMIN"}),
-        senha: z.string().min(4, {message : "a senha deve ocnter pelo menos 4 caracteres"})
+        name: z.string().min(4, "o Nome deve ter pelo menos 4 caracteres"),
+        perfil: z.enum(['PADRAO', 'GERENTE', 'ADMIN'], "o perfil deve ser PADRAO, GERENTE ou ADMIN"),
+        senha: z.string().min(4, "a senha deve conter pelo menos 4 caracteres")
     })
 
     //validar todos os dados do zod
     const validationResult = updateUserSchema.safeParse(request.body);
-    if(!validationResult.success){
-        const error = new Error(validationResult.error.message);
-        error.status = 400;
-        error.validationErrors = validationResult.error.errors;
-        return next(error);
+    if (!validationResult.success) {
+        return next(validationResult.error);
     }
 
 
@@ -188,27 +162,24 @@ rotas.put('/pessoas/:id', authenticate, authorize(['ADMIN', 'GERENTE']), async (
     const id = request.params.id?.trim();
     //verifica se tem um id
     if (!id) {
-        const error = new Error('id invalido')
-        error.status = 401
-        return next(error);
+        return next(new ApiError('Id inválido', 401));
     }
 
     //criptografa nova senha
     const senhaCriptografada = await bcrypt.hash(data.senha, 10);
 
     //verifica se existe um usuario com o id inserido na url
-    const user = await prisma.user.findFirst({
+    let user = await prisma.user.findFirst({
         where: { id },
     })
 
     //se não existir, lanca um erro e interrompe o processo
     if (!user) {
-        const error = new Error('Usuário não encontrado pelo id');
-        error.status = 404;
-        return next(error); // Interrompe a execução se o usuário não for encontrado
+        return next(new ApiError('Usuário não encontrado', 404));
+        // Interrompe a execução se o usuário não for encontrado
     }
 
-    await prisma.user.update({
+    user = await prisma.user.update({
         where: {
             id: id
         },
@@ -217,9 +188,8 @@ rotas.put('/pessoas/:id', authenticate, authorize(['ADMIN', 'GERENTE']), async (
             perfil: data.perfil,
             senha: senhaCriptografada
         },
-    }).then(user => {
-        response.status(200).json(user)
-    }).catch(error => next(error))
+    });
+    return response.status(200).json(user)
 
 })
 
@@ -229,9 +199,7 @@ rotas.delete('/pessoas/:id', authenticate, authorize(['ADMIN']), async (request,
     const id = request.params.id?.trim();
     //verifica se tem um id
     if (!id) {
-        const error = new Error('id invalido')
-        error.status = 401
-        return next(error);
+        return next(new ApiError('Usuário não encontrado', 401));
     }
 
     //verifica se existe um usuario com o id inserido na url
@@ -240,21 +208,15 @@ rotas.delete('/pessoas/:id', authenticate, authorize(['ADMIN']), async (request,
     });
 
     if (!user) {
-        const error = new Error('usuário não encontrado pelo id inserido')
-        error.status = 404
-        return next(error);
+        return next(new ApiError('Usuário não encontrado pelo id inserido', 404));
     }
 
     await prisma.user.delete({
         where: {
             id: id
         }
-    }).then(user => {
-        response.status(200).json({ message: `Usuário ${user.name} deletado com sucesso` });
-    }).catch(error => {
-        next(error);
-    })
-
+    });
+    return response.status(200).json({ message: `Usuário ${user.name} deletado com sucesso` });
 })
 
 export default rotas;
