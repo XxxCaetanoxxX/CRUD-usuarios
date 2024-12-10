@@ -59,7 +59,7 @@ rotas.post('/login', async (request, response, next) => {
 rotas.get('/usuario/logado', authenticate, async (request, response, next) => {
     const userId = request.user.userId;
 
-    await prisma.user.findFirst({
+    const user = await prisma.user.findFirst({
         where: {
             id: userId
         }
@@ -93,21 +93,16 @@ rotas.post('/pessoas', authenticate, authorize(['ADMIN', 'GERENTE']), async (req
     // pega a senha inserida no json e a codifica
     const senhaCriptografada = await bcrypt.hash(data.senha, 10);
 
-    await prisma.user.create({
+    const user = await prisma.user.create({
         data: {
             name: data.name,
             perfil: data.perfil,
             //cria um usuario com a senha criptografada
             senha: senhaCriptografada
         }
-    }).then(user => {
-        response.status(201).json(user)
-    }).catch(error => {
-        error = new Error('Erro ao criar usuário');
-        error.status = 401;
-        next(error);
-    })
+    });
 
+    response.status(201).json(user)
 })
 
 //recuperar todas as pessoas
@@ -139,6 +134,28 @@ rotas.get('/pessoas/:name', authenticate, async (request, response, next) => {
     }
 
     response.status(200).json(user);
+
+})
+
+rotas.get('/usuario/:id', authenticate, async (request, response, next)=>{
+    const id = request.params.id?.trim() || null;
+
+    if(!id){
+        return next(new ApiError("O id não pode ser nulo", 400));
+    }
+
+    const user = await prisma.user.findFirst({
+        where: {
+             id
+        }
+    });
+
+    if(!user){
+        return next(new ApiError("O com id fornecido não foi encontrado", 404));
+    }
+
+    response.status(200).json(user);
+
 
 })
 
