@@ -66,7 +66,7 @@ rotas.get('/usuario/logado', authenticate, async (request, response, next) => {
         return next(new ApiError('Usuário não encontrado', 404));
     }
 
-    response.status(200).json(user);
+    return response.status(200).json(user);
 
 
 });
@@ -99,14 +99,14 @@ rotas.post('/pessoas', authenticate, authorize(['ADMIN', 'GERENTE']), async (req
         }
     });
 
-    response.status(201).json(user)
+    return response.status(201).json(user)
 })
 
 //recuperar todas as pessoas
 rotas.get('/pessoas', authenticate, async (request, response) => {
 
     const users = await prisma.user.findMany()
-    response.status(200).json(users)
+    return response.status(200).json(users)
 
 })
 
@@ -130,7 +130,7 @@ rotas.get('/pessoas/:name', authenticate, async (request, response, next) => {
         return next(new ApiError(`usuário com o nome ${name} não encontrado`, 404));
     }
 
-    response.status(200).json(user);
+    return response.status(200).json(user);
 
 })
 
@@ -152,7 +152,7 @@ rotas.get('/usuario/:id', authenticate, async (request, response, next)=>{
         return next(new ApiError("O com id fornecido não foi encontrado", 404));
     }
 
-    response.status(200).json(user);
+    return response.status(200).json(user);
 
 
 })
