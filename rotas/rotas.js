@@ -36,23 +36,20 @@ rotas.post('/login', async (request, response, next) => {
         return next(new ApiError('Usuário não encontrado', 404));
     }
 
-    // Compara a senha
-    return bcrypt.compare(data.senha, user.senha).then(isSenhaValida => {
-        if (!isSenhaValida) {
-            return next(new ApiError('Senha inválida', 401));
-        }
+    //compara senha
+    const isSenhaValida = await bcrypt.compare (data.senha, user.senha);
+    if (!isSenhaValida) {
+        return next(new ApiError('Senha inválida', 401));
+    }
 
-        // Gera o token JWT
-        const token = jwt.sign(
-            { userId: user.id, perfil: user.perfil },
-            process.env.JWT_SECRETY,
-            { expiresIn: '2h' }
-        );
+    //gera token
+    const token = jwt.sign(
+        { userId: user.id, perfil: user.perfil },
+        process.env.JWT_SECRETY,
+        { expiresIn: '2h' }
+    );
 
-        response.status(200).json({ token });
-    });
-
-
+    return response.status(200).json({ token });
 });
 
 //retorna os dados do usuário logado
