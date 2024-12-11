@@ -3,6 +3,7 @@ import rotas from './rotas/rotas.js';
 import { PrismaClient } from '@prisma/client';
 import { ApiError } from './Erros/erros.js';
 import { z } from 'zod'
+import rotasCarros from './rotas/rotasCarros.js'
 
 
 const app = express()
@@ -11,6 +12,7 @@ const prisma = new PrismaClient({ log: ['query'], })
 //informa que os dados virão no formato json
 app.use(express.json())
 app.use(rotas);
+app.use(rotasCarros);
 
 app.use((err, req, res, next) => {
   // status padrão se não estiver definido
@@ -39,3 +41,20 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(process.env.PORT ? Number(process.env.PORT) : 3000, () => console.log('Servidor rodando'));
+
+// COMANDS
+// npm run dev
+// npx prisma studio
+// node --env-file=.env server.js
+// npx prisma init
+// npx prisma db push
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//

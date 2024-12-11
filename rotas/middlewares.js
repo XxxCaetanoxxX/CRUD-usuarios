@@ -21,6 +21,7 @@ export function authenticate(request, response, next) {
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRETY);
         //decodifica todos os dados do usuário que vem do token
+        //e passa para request.user
         request.user = decoded;
         next();
     } catch (error) {

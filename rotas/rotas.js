@@ -3,13 +3,13 @@ import { authenticate, authorize } from './middlewares.js';
 import { z } from 'zod'
 import bcrypt from 'bcrypt';
 import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient({ log: ['query'], })
 import jwt from 'jsonwebtoken';
 import { ApiError } from '../Erros/erros.js';
 
 
 import express from 'express';
 
+const prisma = new PrismaClient({ log: ['query'], })
 const rotas = Router();
 
 //fazer login
@@ -37,7 +37,7 @@ rotas.post('/login', async (request, response, next) => {
     }
 
     //compara senha
-    const isSenhaValida = await bcrypt.compare (data.senha, user.senha);
+    const isSenhaValida = await bcrypt.compare(data.senha, user.senha);
     if (!isSenhaValida) {
         return next(new ApiError('Senha inválida', 401));
     }
@@ -105,7 +105,11 @@ rotas.post('/pessoas', authenticate, authorize(['ADMIN', 'GERENTE']), async (req
 //recuperar todas as pessoas
 rotas.get('/pessoas', authenticate, async (request, response) => {
 
-    const users = await prisma.user.findMany()
+    const users = await prisma.user.findMany({
+        include: {
+            carros: true,
+        }
+    })
     return response.status(200).json(users)
 
 })
@@ -122,7 +126,10 @@ rotas.get('/pessoas/:name', authenticate, async (request, response, next) => {
     const user = await prisma.user.findFirst({
         where: {
             name: name
-        }
+        },
+        include: {
+            carros: true,
+        },
     });
 
     //se não existir, lança um erro e encerra o processo
@@ -135,20 +142,23 @@ rotas.get('/pessoas/:name', authenticate, async (request, response, next) => {
 })
 
 //recuperando pessoa por id
-rotas.get('/usuario/:id', authenticate, async (request, response, next)=>{
+rotas.get('/usuario/:id', authenticate, async (request, response, next) => {
     const id = request.params.id?.trim() || null;
 
-    if(!id){
+    if (!id) {
         return next(new ApiError("O id não pode ser nulo", 400));
     }
 
     const user = await prisma.user.findFirst({
         where: {
-             id
+            id
+        },
+        include: {
+            carros: true
         }
     });
 
-    if(!user){
+    if (!user) {
         return next(new ApiError("O com id fornecido não foi encontrado", 404));
     }
 
