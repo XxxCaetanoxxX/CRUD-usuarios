@@ -5,8 +5,10 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { ApiError } from '../Erros/erros.js';
 import { prisma } from '../prisma/prisma_class.js'
+import { PessoaService } from '../services/pessoa.service.js';
 
 const rotas = Router();
+const pessoaService = new PessoaService();
 
 //fazer login
 rotas.post('/login', async (request, response, next) => {
@@ -23,10 +25,7 @@ rotas.post('/login', async (request, response, next) => {
 
     const data = loginUserSchema.parse(request.body)
 
-    const user = await prisma.user
-        .findFirst({
-            where: { name: data.name },
-        });
+    const user = await pessoaService.findUserByName(data.name);
 
     if (!user) {
         return next(new ApiError('Usuário não encontrado', 404));
@@ -52,11 +51,7 @@ rotas.post('/login', async (request, response, next) => {
 rotas.get('/usuario/logado', authenticate, async (request, response, next) => {
     const userId = request.user.userId;
 
-    const user = await prisma.user.findFirst({
-        where: {
-            id: userId
-        }
-    });
+    const user = await pessoaService.findUserById(userId)
 
     if (!user) {
         return next(new ApiError('Usuário não encontrado', 404));
@@ -89,14 +84,7 @@ rotas.post('/pessoas', authenticate, authorize(['ADMIN', 'GERENTE']), async (req
     // pega a senha inserida no json e a codifica
     const senhaCriptografada = await bcrypt.hash(data.senha, 10);
 
-    const user = await prisma.user.create({
-        data: {
-            name: data.name,
-            perfil: data.perfil,
-            //cria um usuario com a senha criptografada
-            senha: senhaCriptografada
-        }
-    });
+    const user = await pessoaService.createUser(data, senhaCriptografada);
 
     return response.status(201).json({
         id: user.id,
@@ -108,11 +96,7 @@ rotas.post('/pessoas', authenticate, authorize(['ADMIN', 'GERENTE']), async (req
 //recuperar todas as pessoas
 rotas.get('/pessoas', authenticate, async (request, response) => {
 
-    const users = await prisma.user.findMany({
-        include: {
-            carros: true,
-        }
-    })
+    const users = await pessoaService.findMany();
 
     //map com dados que serão retornados
     const userData = users.map(user => ({
@@ -134,14 +118,7 @@ rotas.get('/pessoas/:name', authenticate, async (request, response, next) => {
     }
 
     //verifica se o usuario existe
-    const user = await prisma.user.findFirst({
-        where: {
-            name: name
-        },
-        include: {
-            carros: true,
-        },
-    });
+    const user = await pessoaService.findUserByName(name);
 
     //se não existir, lança um erro e encerra o processo
     if (!user) {
@@ -164,17 +141,10 @@ rotas.get('/usuario/:id', authenticate, async (request, response, next) => {
         return next(new ApiError("O id não pode ser nulo", 400));
     }
 
-    const user = await prisma.user.findFirst({
-        where: {
-            id
-        },
-        include: {
-            carros: true
-        }
-    });
+    const user = await pessoaService.findUserById(id);
 
     if (!user) {
-        return next(new ApiError("O com id fornecido não foi encontrado", 404));
+        return next(new ApiError("O usuario com id fornecido não foi encontrado", 404));
     }
 
     return response.status(200).json({
@@ -213,9 +183,7 @@ rotas.put('/pessoas/:id', authenticate, authorize(['ADMIN', 'GERENTE']), async (
     const senhaCriptografada = await bcrypt.hash(data.senha, 10);
 
     //verifica se existe um usuario com o id inserido na url
-    let user = await prisma.user.findFirst({
-        where: { id },
-    })
+    let user = await pessoaService.findUserById(id)
 
     //se não existir, lanca um erro e interrompe o processo
     if (!user) {
@@ -223,20 +191,11 @@ rotas.put('/pessoas/:id', authenticate, authorize(['ADMIN', 'GERENTE']), async (
         // Interrompe a execução se o usuário não for encontrado
     }
 
-    user = await prisma.user.update({
-        where: {
-            id: id
-        },
-        data: {
-            name: data.name,
-            perfil: data.perfil,
-            senha: senhaCriptografada
-        },
-    });
+    const updatedUser = await pessoaService.updateUserById(id, data, senhaCriptografada);
     return response.status(200).json({
-        id: user.id,
-        name: user.name,
-        perfil: user.perfil
+        id: updatedUser.id,
+        name: updatedUser.name,
+        perfil: updatedUser.perfil
     })
 
 })
@@ -251,19 +210,14 @@ rotas.delete('/pessoas/:id', authenticate, authorize(['ADMIN']), async (request,
     }
 
     //verifica se existe um usuario com o id inserido na url
-    const user = await prisma.user.findFirst({
-        where: { id },
-    });
+    const user = await pessoaService.findUserById(id)
 
     if (!user) {
         return next(new ApiError('Usuário não encontrado pelo id inserido', 404));
     }
 
-    await prisma.user.delete({
-        where: {
-            id: id
-        }
-    });
+    await pessoaService.deleteUserById(id);
+
     return response.status(200).json({ message: `Usuário ${user.name} deletado com sucesso` });
 })
 
