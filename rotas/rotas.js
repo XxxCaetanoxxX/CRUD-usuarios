@@ -65,10 +65,13 @@ rotas.get('/usuario/logado', authenticate, async (request, response, next) => {
     if (!user) {
         return next(new ApiError('Usuário não encontrado', 404));
     }
-
-    return response.status(200).json(user);
-
-
+    return response.status(200).json(
+        {
+            id: user.id,
+            name: user.name,
+            perfil: user.perfil
+        }
+    );
 });
 
 //criar usuario
@@ -99,7 +102,11 @@ rotas.post('/pessoas', authenticate, authorize(['ADMIN', 'GERENTE']), async (req
         }
     });
 
-    return response.status(201).json(user)
+    return response.status(201).json({
+        id: user.id,
+        name: user.name,
+        perfil: user.perfil
+    })
 })
 
 //recuperar todas as pessoas
@@ -110,7 +117,15 @@ rotas.get('/pessoas', authenticate, async (request, response) => {
             carros: true,
         }
     })
-    return response.status(200).json(users)
+
+    //map com dados que serão retornados
+    const userData = users.map(user => ({
+        id: user.id,
+        name: user.name,
+        perfil: user.perfil
+    }));
+
+    return response.status(200).send(JSON.stringify(userData, null, 4));
 
 })
 
@@ -137,7 +152,11 @@ rotas.get('/pessoas/:name', authenticate, async (request, response, next) => {
         return next(new ApiError(`usuário com o nome ${name} não encontrado`, 404));
     }
 
-    return response.status(200).json(user);
+    return response.status(200).json({
+        id: user.id,
+        name: user.name,
+        perfil: user.perfil
+    });
 
 })
 
@@ -162,7 +181,11 @@ rotas.get('/usuario/:id', authenticate, async (request, response, next) => {
         return next(new ApiError("O com id fornecido não foi encontrado", 404));
     }
 
-    return response.status(200).json(user);
+    return response.status(200).json({
+        id: user.id,
+        name: user.name,
+        perfil: user.perfil
+    });
 
 
 })
@@ -214,7 +237,11 @@ rotas.put('/pessoas/:id', authenticate, authorize(['ADMIN', 'GERENTE']), async (
             senha: senhaCriptografada
         },
     });
-    return response.status(200).json(user)
+    return response.status(200).json({
+        id: user.id,
+        name: user.name,
+        perfil: user.perfil
+    })
 
 })
 
