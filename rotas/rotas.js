@@ -102,7 +102,8 @@ rotas.get('/pessoas', authenticate, async (request, response) => {
     const userData = users.map(user => ({
         id: user.id,
         name: user.name,
-        perfil: user.perfil
+        perfil: user.perfil,
+        carros: user.carros
     }));
 
     return response.status(200).send(JSON.stringify(userData, null, 4));
@@ -216,7 +217,7 @@ rotas.delete('/pessoas/:id', authenticate, authorize(['ADMIN']), async (request,
         return next(new ApiError('Usuário não encontrado pelo id inserido', 404));
     }
 
-    await pessoaService.deleteUserById(id);
+    await pessoaService.deleteUserById(user.id);
 
     return response.status(200).json({ message: `Usuário ${user.name} deletado com sucesso` });
 })
