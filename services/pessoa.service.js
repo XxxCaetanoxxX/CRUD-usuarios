@@ -1,4 +1,5 @@
 import { prisma } from '../prisma/prisma_class.js'
+import bcrypt from 'bcrypt';
 
 export class PessoaService {
 
@@ -31,7 +32,7 @@ export class PessoaService {
             data: {
                 name: data.name,
                 perfil: data.perfil,
-                senha: data.senha
+                senha: await bcrypt.hash(data.senha, 10)
             }
         })
         return user;

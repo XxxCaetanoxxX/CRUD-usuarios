@@ -85,7 +85,7 @@ rotas.post('/pessoas', authenticate, authorize(['ADMIN', 'GERENTE']), async (req
     data = {
         name: data.name,
         perfil: data.perfil,
-        senha: await bcrypt.hash(data.senha, 10)
+        senha: data.senha
     }
 
     const user = await pessoaService.createUser(data);

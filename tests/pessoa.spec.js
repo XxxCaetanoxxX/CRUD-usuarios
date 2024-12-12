@@ -4,7 +4,7 @@ import { PessoaService } from '../services/pessoa.service'
 const user = {
     name: 'user test',
     perfil: "PADRAO",
-    senha: 'senhatESTE'
+    senha: 'senhaTeste'
 }
 
 describe("Pessoas Service", () => {
