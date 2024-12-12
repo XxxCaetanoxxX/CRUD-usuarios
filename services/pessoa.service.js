@@ -26,12 +26,12 @@ export class PessoaService {
         return user;
     }
 
-    async createUser(data, senhaCriptografada) {
+    async createUser(data) {
         const user = await prisma.user.create({
             data: {
                 name: data.name,
                 perfil: data.perfil,
-                senha: senhaCriptografada
+                senha: data.senha
             }
         })
         return user;

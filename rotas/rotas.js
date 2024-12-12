@@ -79,12 +79,16 @@ rotas.post('/pessoas', authenticate, authorize(['ADMIN', 'GERENTE']), async (req
         return next(validationResult.error);
     }
 
-    const data = validationResult.data;
 
-    // pega a senha inserida no json e a codifica
-    const senhaCriptografada = await bcrypt.hash(data.senha, 10);
 
-    const user = await pessoaService.createUser(data, senhaCriptografada);
+    let data = validationResult.data;
+    data = {
+        name: data.name,
+        perfil: data.perfil,
+        senha: await bcrypt.hash(data.senha, 10)
+    }
+
+    const user = await pessoaService.createUser(data);
 
     return response.status(201).json({
         id: user.id,
