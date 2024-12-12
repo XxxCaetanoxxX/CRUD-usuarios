@@ -3,7 +3,7 @@ import rotas from './rotas/rotas.js';
 import { PrismaClient } from '@prisma/client';
 import { ApiError } from './Erros/erros.js';
 import { z } from 'zod'
-import rotasCarros from './rotas/rotasCarros.js'
+import rotasCarros from './rotas/rotas_carros.js'
 
 
 const app = express()

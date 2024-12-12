@@ -1,15 +1,15 @@
 import { Router } from 'express';
 import { authenticate, authorize } from './middlewares.js';
 import { z } from 'zod'
-import { PrismaClient } from '@prisma/client';
 import { ApiError } from '../Erros/erros.js';
+import { prisma } from '../prisma/prisma_class.js'
 
 
-const prisma = new PrismaClient({ log: ['query'], })
+
 const rotasCarros = Router();
 
 //adicionar carro a lista do usuario
-rotasCarros.post('/carros', authenticate, async (request, response, next) => {
+rotasCarros.post('/carros', authenticate, authorize(['GERENTE', 'ADMIN']), async (request, response, next) => {
 
     const createCarSchema = z.object({
         nome: z.string().min(4, "Nome do carro deve ter mais do que 4 caracters"),

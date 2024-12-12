@@ -2,14 +2,10 @@ import { Router } from 'express';
 import { authenticate, authorize } from './middlewares.js';
 import { z } from 'zod'
 import bcrypt from 'bcrypt';
-import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import { ApiError } from '../Erros/erros.js';
+import { prisma } from '../prisma/prisma_class.js'
 
-
-import express from 'express';
-
-const prisma = new PrismaClient({ log: ['query'], })
 const rotas = Router();
 
 //fazer login
